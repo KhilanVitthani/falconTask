@@ -1,12 +1,14 @@
 import 'package:animated_bottom_navigation_bar/animated_bottom_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
 import '../../../constant/sizeConstant.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
 
 class HomeView extends GetWidget<HomeController> {
   const HomeView({super.key});
+
   @override
   Widget build(BuildContext context) {
     MySize().init(context);
@@ -34,12 +36,9 @@ class HomeView extends GetWidget<HomeController> {
                           borderRadius: BorderRadius.circular(50),
                           color: Colors.white,
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.account_circle,
-                            size: MySize.getHeight(20),
-                          ),
+                        child: Icon(
+                          Icons.account_circle,
+                          size: MySize.getHeight(50),
                         ),
                       ),
                       SizedBox(width: MySize.getWidth(20)),
@@ -54,11 +53,16 @@ class HomeView extends GetWidget<HomeController> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
-                            '26 Feb 2024 - 3 May 2024',
-                            style: TextStyle(
-                              fontSize: MySize.getHeight(16),
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                '26 Feb 2024 - 3 May 2024',
+                                style: TextStyle(
+                                  fontSize: MySize.getHeight(16),
+                                ),
+                              ),
+                              Icon(Icons.keyboard_arrow_down_rounded),
+                            ],
                           ),
                         ],
                       ),
@@ -130,21 +134,25 @@ class HomeView extends GetWidget<HomeController> {
         //params
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: AnimatedBottomNavigationBar(
-        height: MySize.getHeight(100),
-        icons: const [
-          Icons.apps,
-          Icons.calendar_today_rounded,
-          Icons.access_time_outlined,
-          Icons.calendar_month_rounded,
-        ],
-        activeIndex: 0,
-
-        gapLocation: GapLocation.center,
-        notchSmoothness: NotchSmoothness.softEdge,
-        onTap: (index) {},
-        //other params
-      ),
+      bottomNavigationBar: Obx(() {
+        return AnimatedBottomNavigationBar(
+          height: MySize.getHeight(100),
+          icons: const [
+            Icons.apps,
+            Icons.calendar_today_rounded,
+            Icons.access_time_outlined,
+            Icons.calendar_month_rounded,
+          ],
+          activeIndex: controller.selectedIndex.value,
+          gapLocation: GapLocation.center,
+          activeColor: Colors.yellow.withOpacity(0.7),
+          notchSmoothness: NotchSmoothness.softEdge,
+          onTap: (index) {
+            controller.selectedIndex.value = index;
+          },
+          //other params
+        );
+      }),
     );
   }
 

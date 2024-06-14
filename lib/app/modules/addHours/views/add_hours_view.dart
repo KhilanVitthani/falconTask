@@ -1,12 +1,18 @@
+import 'dart:io';
+
 import 'package:easy_date_timeline/easy_date_timeline.dart';
 import 'package:falcon_task/app/constant/sizeConstant.dart';
+import 'package:falcon_task/app/model/timeDataModel.dart';
 import 'package:falcon_task/app/modules/home/controllers/home_controller.dart';
+import 'package:falcon_task/app/service/CameraService.dart';
+import 'package:falcon_task/app/service/databaseService.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:scroll_time_picker/scroll_time_picker.dart';
+
+import '../../../../main.dart';
 import '../../home/views/home_view.dart';
 import '../controllers/add_hours_controller.dart';
 
@@ -47,7 +53,43 @@ class AddHoursView extends GetView<AddHoursController> {
                             onChanged: (value) {
                               controller.autoFillHours.value = value;
                               if (value == true) {
-                              } else {}
+                                DateTime now = DateTime.now();
+                                controller.checkInTime = DateTime(
+                                  now.year,
+                                  now.month,
+                                  now.day,
+                                  7,
+                                ).obs;
+                                controller.checkOutTime = DateTime(
+                                  now.year,
+                                  now.month,
+                                  now.day,
+                                  16,
+                                ).obs;
+                                controller.breakTime.value = '01:00';
+                                DateTime checkIn = DateFormat('HH:mm').parse(
+                                  DateFormat('HH:mm')
+                                      .format(controller.checkInTime!.value),
+                                );
+                                DateTime checkOut = DateFormat('HH:mm').parse(
+                                  DateFormat('HH:mm')
+                                      .format(controller.checkOutTime!.value),
+                                );
+                                DateTime breakTime = DateFormat('HH:mm')
+                                    .parse(controller.breakTime.value);
+                                controller.amountCalculation(
+                                    checkIn: checkIn,
+                                    checkOut: checkOut,
+                                    breakTime: breakTime);
+                              } else {
+                                controller.showCalculate.value = false;
+                                controller.checkInTime = null;
+                                controller.checkOutTime = null;
+                                controller.breakTime.value = '';
+                                controller.totalWorkingHours.value = '0';
+                                controller.totalAmount.value = 0.0;
+                                controller.totalHours.value = 0.0;
+                              }
                             },
                             activeColor: Colors.yellow,
                           ),
@@ -104,6 +146,11 @@ class AddHoursView extends GetView<AddHoursController> {
                                   if (totalCheckInAndBreakTime
                                       .isBefore(checkOut)) {
                                     controller.breakTime.refresh();
+                                    controller.amountCalculation(
+                                      checkIn: checkIn,
+                                      checkOut: checkOut,
+                                      breakTime: breakTime,
+                                    );
                                   } else {
                                     getSnackBar(
                                       context: context,
@@ -128,11 +175,411 @@ class AddHoursView extends GetView<AddHoursController> {
                       title: "Check Out",
                       isFromCheckOut: true,
                     ),
+                    Spacing.height(20),
+                    customWidget(
+                      title: 'Note (Optional)',
+                      subTitle: controller.noteString.value,
+                      icon: Icons.note_add,
+                      onTap: () {
+                        customBottomSheet(
+                          context: context,
+                          title: 'Note',
+                          widget: Column(
+                            children: [
+                              TextField(
+                                controller:
+                                    controller.descriptionController.value,
+                                maxLines: 3,
+                                minLines: 1,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter your note here',
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                          color:
+                                              Colors.yellow.withOpacity(0.7))),
+                                ),
+                              ),
+                              Spacing.height(20),
+                              InkWell(
+                                onTap: () {
+                                  controller.noteString.value = controller
+                                      .descriptionController.value.text;
+                                  Get.back();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6.0),
+                                  child: Container(
+                                    alignment: Alignment.centerRight,
+                                    width: double.infinity,
+                                    child: Text(
+                                      "Done",
+                                      style: TextStyle(
+                                        fontSize: MySize.getHeight(16),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    Divider(
+                      height: 1,
+                      color: Colors.grey.shade200,
+                    ),
+                    customWidget(
+                      title: 'Attachment (Optional)',
+                      subTitle: (controller.saveAttachmentsList.isEmpty)
+                          ? "-"
+                          : '${controller.saveAttachmentsList.length} File',
+                      icon: Icons.attach_file,
+                      onTap: () {
+                        controller.attachmentsList.clear();
+                        controller.attachmentsList
+                            .addAll(controller.saveAttachmentsList);
+                        customBottomSheet(
+                          context: context,
+                          title: 'Attachments',
+                          widget: Column(
+                            children: [
+                              Obx(() {
+                                return SizedBox(
+                                  height: MySize.getHeight(100),
+                                  width: MySize.safeWidth,
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      children: [
+                                        Row(
+                                            children: List.generate(
+                                                controller.attachmentsList
+                                                    .length, (index) {
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8.0),
+                                            child: Stack(
+                                              alignment: Alignment.topRight,
+                                              children: [
+                                                Container(
+                                                  height: MySize.getHeight(100),
+                                                  width: MySize.getHeight(100),
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                    color: Colors.grey.shade200,
+                                                  ),
+                                                  child: ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                    child: Image.file(
+                                                      File(controller
+                                                              .attachmentsList[
+                                                          index]),
+                                                      fit: BoxFit.cover,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Positioned(
+                                                    child: InkWell(
+                                                  onTap: () {
+                                                    controller.attachmentsList
+                                                        .removeAt(index);
+                                                    controller.attachmentsList
+                                                        .refresh();
+                                                  },
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.all(5),
+                                                    decoration: BoxDecoration(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              6),
+                                                      color: Colors.grey,
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.close_sharp,
+                                                      color: Colors.white,
+                                                      size:
+                                                          MySize.getHeight(15),
+                                                    ),
+                                                  ),
+                                                )),
+                                              ],
+                                            ),
+                                          );
+                                        })),
+                                        InkWell(
+                                          onTap: () {
+                                            showCupertinoModalPopup(
+                                              barrierDismissible: true,
+                                              context: context,
+                                              builder: (BuildContext context) =>
+                                                  CupertinoActionSheet(
+                                                actions: <CupertinoActionSheetAction>[
+                                                  CupertinoActionSheetAction(
+                                                    child: const Text('Camera',
+                                                        style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w400,
+                                                            color: Colors
+                                                                .blueAccent)),
+                                                    onPressed: () {
+                                                      openCamera()
+                                                          .then((value) {
+                                                        if (value != null) {
+                                                          controller
+                                                              .attachmentsList
+                                                              .add(value.path);
+                                                          controller
+                                                              .attachmentsList
+                                                              .refresh();
+                                                        }
+                                                      });
+                                                      Navigator.pop(context);
+                                                      // Perform action 1
+                                                    },
+                                                  ),
+                                                  CupertinoActionSheetAction(
+                                                    child: const Text('Photos',
+                                                        style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w400,
+                                                            color: Colors
+                                                                .blueAccent)),
+                                                    onPressed: () {
+                                                      openGallery()
+                                                          .then((value) {
+                                                        if (value != null) {
+                                                          controller
+                                                              .attachmentsList
+                                                              .add(value.path);
+                                                          controller
+                                                              .attachmentsList
+                                                              .refresh();
+                                                        }
+                                                      });
+                                                      Navigator.pop(context);
+                                                      // Perform action 2
+                                                    },
+                                                  ),
+                                                ],
+                                                cancelButton:
+                                                    CupertinoActionSheetAction(
+                                                  child: const Text('Cancel',
+                                                      style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Colors
+                                                              .blueAccent)),
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                  },
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: Container(
+                                            height: MySize.getHeight(100),
+                                            width: MySize.getHeight(100),
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              color: Colors.white,
+                                              border: Border.all(
+                                                color: Colors.grey,
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              Icons.add,
+                                              color: Colors.grey,
+                                              size: MySize.getHeight(30),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                              Spacing.height(20),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        elevation: 0,
+                                        backgroundColor: Colors.yellow,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        controller.saveAttachmentsList.clear();
+                                        controller.saveAttachmentsList
+                                            .addAll(controller.attachmentsList);
+                                        Get.back();
+                                      },
+                                      child: Text('Save Attachments',
+                                          style: TextStyle(
+                                            fontSize: MySize.getHeight(16),
+                                            color: Colors.black,
+                                          )),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
             ),
           ],
+        ),
+        bottomNavigationBar: Container(
+          padding: const EdgeInsets.all(20),
+          color: Colors.white,
+          child: Obx(() {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                (controller.showCalculate.value == true)
+                    ? Row(
+                        children: [
+                          const Spacer(),
+                          Column(
+                            children: [
+                              Text(
+                                'Hours',
+                                style: TextStyle(
+                                  fontSize: MySize.getHeight(14),
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              Text(
+                                controller.totalWorkingHours.value,
+                                style: TextStyle(
+                                  fontSize: MySize.getHeight(16),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Column(
+                            children: [
+                              Text(
+                                'Amount',
+                                style: TextStyle(
+                                  fontSize: MySize.getHeight(14),
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              Text(
+                                '${controller.totalAmount.value.toStringAsFixed(0)} DKK',
+                                style: TextStyle(
+                                  fontSize: MySize.getHeight(16),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                        ],
+                      )
+                    : Container(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: Colors.yellow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        onPressed: () {
+                          if (isNullEmptyOrFalse(controller.checkInTime) &&
+                              isNullEmptyOrFalse(controller.checkOutTime)) {
+                            getSnackBar(
+                                context: context,
+                                text:
+                                    'Please select Check In - Check Out Time');
+                          } else if (isNullEmptyOrFalse(
+                              controller.checkInTime)) {
+                            getSnackBar(
+                                context: context,
+                                text: 'Please select Check In Time');
+                          } else if (isNullEmptyOrFalse(
+                              controller.checkOutTime)) {
+                            getSnackBar(
+                                context: context,
+                                text: 'Please select Check out Time');
+                          } else {
+                            DateTime checkIn = DateFormat('HH:mm a').parse(
+                                DateFormat('HH:mm a')
+                                    .format(controller.checkInTime!.value));
+
+                            DateTime checkOut = DateFormat('HH:mm a').parse(
+                                DateFormat('HH:mm a')
+                                    .format(controller.checkOutTime!.value));
+                            DateTime breakTime = DateFormat('HH:mm a').parse(
+                                DateFormat('HH:mm a').format(
+                                    controller.breakSelectedTime.value));
+                            if (checkIn.isAfter(checkOut)) {
+                              getSnackBar(
+                                context: context,
+                                text:
+                                    'Check In time should be before Check Out time',
+                              );
+                            } else {
+                              controller.amountCalculation(
+                                checkIn: checkIn,
+                                checkOut: checkOut,
+                                breakTime: breakTime,
+                              );
+                              TimeDataModel checkOutModel = TimeDataModel(
+                                date: controller.selectedDate.value.toString(),
+                                dayType: controller.selectedDay.value,
+                                checkInTime: DateFormat('HH:mm a')
+                                    .format(controller.checkInTime!.value),
+                                brakeTime: controller.breakTime.value,
+                                checkOutTime: DateFormat('HH:mm a')
+                                    .format(controller.checkOutTime!.value),
+                                note: controller.noteString.value,
+                                attachments:
+                                    controller.saveAttachmentsList.join(","),
+                                totalWorkingHour: controller.totalHours.value
+                                    .toStringAsFixed(2),
+                              );
+                              getIt<DataBaseService>().insert(checkOutModel);
+                            }
+                          }
+                        },
+                        child: Text('Save Hours',
+                            style: TextStyle(
+                              fontSize: MySize.getHeight(16),
+                              color: Colors.black,
+                            )),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }),
         ),
       ),
     );
@@ -159,6 +606,15 @@ class AddHoursView extends GetView<AddHoursController> {
             getSnackBar(
               context: context,
               text: 'Please select Check In Time first',
+            );
+            return;
+          }
+        }
+        if (isFromCheckOut) {
+          if (isNullEmptyOrFalse(controller.breakTime.value)) {
+            getSnackBar(
+              context: context,
+              text: 'Please select break Time first',
             );
             return;
           }
@@ -199,6 +655,10 @@ class AddHoursView extends GetView<AddHoursController> {
                     if (totalCheckInAndBreakTime.isBefore(checkOut)) {
                       controller.checkOutTime =
                           controller.selectedTime.value.obs;
+                      controller.amountCalculation(
+                          checkIn: checkIn,
+                          checkOut: checkOut,
+                          breakTime: breakTime);
                     } else {
                       getSnackBar(
                         context: context,
@@ -207,33 +667,13 @@ class AddHoursView extends GetView<AddHoursController> {
                       );
                     }
                   } else {
-                    // DateTime breakTime = DateFormat('HH:mm')
-                    //     .parse(controller.breakTime.value);
-
-                    // controller.ShowCalculate.value = true;
-                    // Duration totalWorkingHour =
-                    // checkOut.difference(checkIn);
-                    // totalWorkingHour = totalWorkingHour -
-                    //     Duration(
-                    //         hours: breakTime.hour,
-                    //         minutes: breakTime.minute,
-                    //         seconds: 0);
-                    // controller.totalWorkingHours.value =
-                    //     format(totalWorkingHour);
-                    // print(totalWorkingHour);
-                    // List<String> parts = totalWorkingHour
-                    //     .toString()
-                    //     .split(':');
-                    // int hours = int.tryParse(parts[0]) ?? 0;
-                    // int minutes = int.tryParse(parts[1]) ?? 0;
-                    // double seconds =
-                    //     double.tryParse(parts[2]) ?? 0.0;
-                    // double totalHours = hours +
-                    //     (minutes / 60.0) +
-                    //     (seconds / 3600.0);
-                    // print(totalHours);
-                    // double salary = totalHours * 100;
-                    // controller.TotalAmount.value = salary;
+                    DateTime breakTime =
+                        DateFormat('HH:mm').parse(controller.breakTime.value);
+                    controller.amountCalculation(
+                      checkIn: checkIn,
+                      checkOut: checkOut,
+                      breakTime: breakTime,
+                    );
                     controller.checkOutTime = controller.selectedTime.value.obs;
                   }
                 }
@@ -253,6 +693,13 @@ class AddHoursView extends GetView<AddHoursController> {
                       duration: 1000,
                     );
                   } else {
+                    DateTime breakTime =
+                        DateFormat('HH:mm').parse(controller.breakTime.value);
+                    controller.amountCalculation(
+                      checkIn: checkIn,
+                      checkOut: checkOut,
+                      breakTime: breakTime,
+                    );
                     controller.checkInTime = controller.selectedTime.value.obs;
                   }
                 } else {

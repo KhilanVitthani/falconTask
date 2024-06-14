@@ -7,6 +7,7 @@ class HomeController extends GetxController {
     ListItemModel(title: "150 Km", subTitle: "400 DKK"),
     ListItemModel(title: "0 Days", subTitle: "Leave"),
   ];
+  RxInt selectedIndex = 0.obs;
 }
 
 class ListItemModel {
