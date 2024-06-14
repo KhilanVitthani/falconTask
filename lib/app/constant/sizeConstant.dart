@@ -206,7 +206,7 @@ getSnackBar(
     {required BuildContext context,
     String text = "",
     double size = 16,
-    int duration = 500}) {
+    int duration = 2000}) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(text, style: TextStyle(fontSize: MySize.getHeight(size))),
@@ -232,4 +232,3 @@ getGetXSnackBar({String title = "", String msg = ""}) {
     snackPosition: SnackPosition.BOTTOM,
   );
 }
-

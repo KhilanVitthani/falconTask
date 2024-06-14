@@ -65,9 +65,59 @@ class AddHoursView extends GetView<AddHoursController> {
                     ),
                     customWidget(
                       title: 'Break',
-                      subTitle: "-",
+                      subTitle: (isNullEmptyOrFalse(controller.breakTime.value))
+                          ? "-"
+                          : controller.breakTime.value,
                       autoFillHours: controller.autoFillHours.value,
                       icon: Icons.pause,
+                      onTap: () {
+                        if (isNullEmptyOrFalse(controller.checkInTime)) {
+                          getSnackBar(
+                            context: context,
+                            text: 'Please select Check In Time first',
+                          );
+                        } else {
+                          customBottomSheet(
+                            context: context,
+                            title: 'Break Time',
+                            widget: selectTimePicker(
+                              context: context,
+                              selectedTime: controller.breakSelectedTime,
+                              onPressed: () {
+                                controller.breakTime.value = DateFormat('HH:mm')
+                                    .format(controller.breakSelectedTime.value);
+                                if (!isNullEmptyOrFalse(
+                                    controller.checkOutTime)) {
+                                  DateTime checkIn = DateFormat('HH:mm a')
+                                      .parse(DateFormat('HH:mm a').format(
+                                          controller.checkInTime!.value));
+                                  String checkOutTime = DateFormat('HH:mm a')
+                                      .format(controller.checkOutTime!.value);
+                                  DateTime checkOut =
+                                      DateFormat('HH:mm a').parse(checkOutTime);
+                                  DateTime breakTime = DateFormat('HH:mm')
+                                      .parse(controller.breakTime.value);
+                                  DateTime totalCheckInAndBreakTime =
+                                      checkIn.add(Duration(
+                                          hours: breakTime.hour,
+                                          minutes: breakTime.minute));
+                                  if (totalCheckInAndBreakTime
+                                      .isBefore(checkOut)) {
+                                    controller.breakTime.refresh();
+                                  } else {
+                                    getSnackBar(
+                                      context: context,
+                                      text:
+                                          'Your break time is more than your working hours',
+                                    );
+                                  }
+                                }
+                                Get.back();
+                              },
+                            ),
+                          );
+                        }
+                      },
                     ),
                     Divider(
                       height: 1,
@@ -91,7 +141,6 @@ class AddHoursView extends GetView<AddHoursController> {
   Widget _checkInAndOutWidget(
       {required BuildContext context,
       required String title,
-      VoidCallback? onTap,
       bool isFromCheckOut = false}) {
     return customWidget(
       title: title,
@@ -105,6 +154,15 @@ class AddHoursView extends GetView<AddHoursController> {
       icon: Icons.access_time_rounded,
       autoFillHours: controller.autoFillHours.value,
       onTap: () {
+        if (isFromCheckOut) {
+          if (isNullEmptyOrFalse(controller.checkInTime)) {
+            getSnackBar(
+              context: context,
+              text: 'Please select Check In Time first',
+            );
+            return;
+          }
+        }
         customBottomSheet(
           context: context,
           title: '$title Time',
@@ -113,7 +171,72 @@ class AddHoursView extends GetView<AddHoursController> {
             selectedTime: controller.selectedTime,
             onPressed: () {
               if (isFromCheckOut) {
-                controller.checkOutTime = controller.selectedTime.value.obs;
+                String checkOutTime =
+                    DateFormat('HH:mm a').format(controller.selectedTime.value);
+                DateTime checkIn = DateFormat('HH:mm a').parse(
+                    DateFormat('HH:mm a')
+                        .format(controller.checkInTime!.value));
+                DateTime checkOut = DateFormat('HH:mm a').parse(checkOutTime);
+                if (checkIn.isAfter(checkOut) ||
+                    checkIn.isAtSameMomentAs(checkOut)) {
+                  getSnackBar(
+                    context: context,
+                    text: 'Check In time should be before Check Out time',
+                  );
+                } else {
+                  if (!isNullEmptyOrFalse(controller.breakTime.value)) {
+                    DateTime checkIn = DateFormat('HH:mm a').parse(
+                        DateFormat('HH:mm a')
+                            .format(controller.checkInTime!.value));
+                    String checkOutTime = DateFormat('HH:mm a')
+                        .format(controller.selectedTime.value);
+                    DateTime checkOut =
+                        DateFormat('HH:mm a').parse(checkOutTime);
+                    DateTime breakTime =
+                        DateFormat('HH:mm').parse(controller.breakTime.value);
+                    DateTime totalCheckInAndBreakTime = checkIn.add(Duration(
+                        hours: breakTime.hour, minutes: breakTime.minute));
+                    if (totalCheckInAndBreakTime.isBefore(checkOut)) {
+                      controller.checkOutTime =
+                          controller.selectedTime.value.obs;
+                    } else {
+                      getSnackBar(
+                        context: context,
+                        text:
+                            'you can not check out because your break time is more than your working hours',
+                      );
+                    }
+                  } else {
+                    // DateTime breakTime = DateFormat('HH:mm')
+                    //     .parse(controller.breakTime.value);
+
+                    // controller.ShowCalculate.value = true;
+                    // Duration totalWorkingHour =
+                    // checkOut.difference(checkIn);
+                    // totalWorkingHour = totalWorkingHour -
+                    //     Duration(
+                    //         hours: breakTime.hour,
+                    //         minutes: breakTime.minute,
+                    //         seconds: 0);
+                    // controller.totalWorkingHours.value =
+                    //     format(totalWorkingHour);
+                    // print(totalWorkingHour);
+                    // List<String> parts = totalWorkingHour
+                    //     .toString()
+                    //     .split(':');
+                    // int hours = int.tryParse(parts[0]) ?? 0;
+                    // int minutes = int.tryParse(parts[1]) ?? 0;
+                    // double seconds =
+                    //     double.tryParse(parts[2]) ?? 0.0;
+                    // double totalHours = hours +
+                    //     (minutes / 60.0) +
+                    //     (seconds / 3600.0);
+                    // print(totalHours);
+                    // double salary = totalHours * 100;
+                    // controller.TotalAmount.value = salary;
+                    controller.checkOutTime = controller.selectedTime.value.obs;
+                  }
+                }
               } else {
                 if (!isNullEmptyOrFalse(controller.checkOutTime)) {
                   DateTime checkOut = DateFormat('hh:mm a').parse(
